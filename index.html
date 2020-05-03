@@ -25,7 +25,8 @@
 			page+="Dimension: "+diagram.nodes.length+"<br>"
 			//symmetry
 			var symmetry=diagramToSymmetry(diagram)
-			page+="Symmetry: "+linkTo(stringifyDiagram(symmetry),identifySymmetry(symmetry)[0])+"<br>"
+			var identity=identifySymmetry(symmetry)
+			page+="Symmetry: "+linkTo(stringifyDiagram(symmetry),identity[0])+"<br>"
 			//facets
 			page+="Facets:<br>"
 			var facets=[]
@@ -69,7 +70,8 @@
 				if(subdimensional){
 					continue
 				}
-				page+=linkTo(stringifyDiagram(facetDiagram))+"<br>"
+				var facetSymmetry=identifySymmetry(diagramToSymmetry(facetDiagram))
+				page+=(identity[1]/facetSymmetry[1])+" "+linkTo(stringifyDiagram(facetDiagram))+"<br>"
 			}
 			return page
 		}
@@ -182,6 +184,8 @@
 				//polygon
 				if(links[0][0]<=6){
 					return [["A2","BC2","H2","G2"][links[0][0]-3],links[0][0]*2]
+				}else{
+					return ["I2("+links[0][0]+")",links[0][0]*2]
 				}
 			}
 			if(diagram.nodes.length==3){
@@ -197,6 +201,20 @@
 					}
 					if(equal){
 						return ["H3",120]
+					}
+				}
+				//G3
+				var symbols=[[6,3],[3,6]]
+				for(var i=0;i<symbols.length;i++){
+					var equal=1
+					for(var j=0;j<2;j++){
+						if(symbols[i][j]!=links[j][0]/links[j][1]){
+							equal=0
+							break
+						}
+					}
+					if(equal){
+						return ["Affine G2",Infinity]
 					}
 				}
 			}
@@ -228,6 +246,22 @@
 					}
 				}
 			}
+			if(diagram.nodes.length==5){
+				//affine F5
+				var symbols=[[3,4,3,3],[3,3,4,3]]
+				for(var i=0;i<symbols.length;i++){
+					var equal=1
+					for(var j=0;j<3;j++){
+						if(symbols[i][j]!=links[j][0]/links[j][1]){
+							equal=0
+							break
+						}
+					}
+					if(equal){
+						return ["Affine F4",Infinity]
+					}
+				}
+			}
 			for(var i=1;i<diagram.links.length-1;i++){
 				if(diagram.links[i][0]>3){
 					return ["Infinite",Infinity]
@@ -240,6 +274,9 @@
 			}
 			if((first[0]==4&&last[0]==3)||(first[0]==3&&last[0]==4)){
 				return ["BC"+diagram.nodes.length,Math.pow(2,diagram.nodes.length)*factorial(diagram.nodes.length)]
+			}
+			if(first[0]==4&&last[0]==4){
+				return ["Affine C"+(diagram.nodes.length-1),Infinity]
 			}
 			return ["Infinite",Infinity]
 		}
