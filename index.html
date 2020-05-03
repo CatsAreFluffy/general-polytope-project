@@ -3,17 +3,29 @@
 <head>
 	<title>General Polytope Project</title>
 	<script type="text/javascript">
-		function generate(){
+		function generatePage(){
 			//https://stackoverflow.com/a/979995 more or less
 			var url=new URL(document.URL)
 			var diagramString=url.searchParams.get("p")
 			if(!diagramString){
-				return "You should specify a polytope. Try <a href=\"?p=o3x4o\">the cuboctahedron</a>."
+				return "You should specify a polytope or a symmetry. Try <a href=\"?p=o3x4o\">the cuboctahedron</a> or <a href=\"?p=o3o4o3o\">icoic symmetry</a>."
 			}
-			var page=""
 			var diagram=parseDiagram(diagramString)
+			if(diagramString.includes("x")){
+				return generatePolytopePage(diagram)
+			}else{
+				return generateSymmetryPage(diagram)
+			}
+		}
+		function generatePolytopePage(diagram){
+			var page=""
+			//diagram
+			page+="CD diagram: "+stringifyDiagram(diagram)+"<br>"
 			//dimension
 			page+="Dimension: "+diagram.nodes.length+"<br>"
+			//symmetry
+			var symmetry=diagramToSymmetry(diagram)
+			page+="Symmetry: "+linkTo(stringifyDiagram(symmetry),identifySymmetry(symmetry)[0])+"<br>"
 			//facets
 			page+="Facets:<br>"
 			var facets=[]
@@ -23,7 +35,7 @@
 				for(var j=0;j<diagram.nodes.length;j++){
 					if(j!=i){
 						facetDiagram.nodes.push(diagram.nodes[j])
-						if(j<diagram.links.length){
+						if(j<diagram.links.length&&!(j+1==i&&i==diagram.links.length)){
 							if(j==i-1){
 								facetDiagram.links.push([2,1])
 							}else{
@@ -33,6 +45,7 @@
 					}
 				}
 				console.log(facetDiagram)
+				facetDiagram=canonizeDiagram(facetDiagram)
 				//filter subdimensional facets
 				var lastActiveNode=-1
 				var lastPrismLink=-1
@@ -43,17 +56,56 @@
 					}
 					if(j<facetDiagram.links.length&&facetDiagram.links[j][0]==2){
 						//no active nodes since the last 2->previous component of the CD diagram is a point
-						if(lastActiveNode<lastPrismLink){
+						if(lastActiveNode<=lastPrismLink){
 							subdimensional=1
 							break
 						}
 						lastPrismLink=j
 					}
 				}
+				if(lastActiveNode<=lastPrismLink){
+					subdimensional=1
+				}
 				if(subdimensional){
 					continue
 				}
 				page+=linkTo(stringifyDiagram(facetDiagram))+"<br>"
+			}
+			return page
+		}
+		function generateSymmetryPage(diagram){
+			var page=""
+			var identity=identifySymmetry(diagram)
+			//name
+			page+="Name: "+identity[0]+"<br>"
+			//order
+			page+="Order: "+identity[1]+"<br>"
+			//diagram
+			page+="CD diagram: "+stringifyDiagram(diagram)+"<br>"
+			//dimension
+			page+="Dimension: "+diagram.nodes.length+"<br>"
+			//polytopes
+			page+="Polytopes with this symmetry:<br>"
+			//generate all if 6D or less, otherwise generate single-ring forms only
+			if(diagram.nodes.length<7){
+				for(var i=1;i<Math.pow(2,diagram.nodes.length);i++){
+					var instanceDiagram={nodes:[],links:diagram.links}
+					var t=i
+					for(var j=0;j<diagram.nodes.length;j++){
+						instanceDiagram.nodes.push(t&1)
+						t>>=1
+					}
+					page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>"
+				}
+			}else{
+				for(var i=0;i<diagram.nodes.length;i++){
+					var instanceDiagram={nodes:[],links:diagram.links}
+					for(var j=0;j<diagram.nodes.length;j++){
+						instanceDiagram.nodes.push(i==j?1:0)
+					}
+					page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>"
+				}
+				page+="...<br>"
 			}
 			return page
 		}
@@ -69,10 +121,11 @@
 				}else if(char==" "){ //blank
 					links.push([2,1])
 				}else{ //nontrivial line of some sort
-					var link=char
-					for(;!"0123456789/".includes(diagram[i]);i++){
+					var link=""
+					for(;"0123456789/".includes(diagram[i]);i++){
 						link+=diagram[i]
 					}
+					i--
 					if(link.includes("/")){ //star line
 						var anons=link.split("/")
 						links.push(anons)
@@ -82,6 +135,204 @@
 				}
 			}
 			return {nodes:nodes,links:links}
+		}
+		function diagramToSymmetry(diagram){
+			var symmetry={nodes:[],links:diagram.links}
+			for(var i=0;i<diagram.nodes.length;i++){
+				symmetry.nodes.push(0)
+			}
+			return symmetry
+		}
+		function factorial(n){
+			if(n<=0){
+				return 1
+			}
+			return n*factorial(n-1)
+		}
+		function identifySymmetry(diagram){
+			var prelinks=diagram.links
+			//identify products
+			var factors=factorizeDiagram(diagram)
+			if(factors.length>1){
+				var ret=["",1]
+				for(var i=0;i<factors.length;i++){
+					var factor=identifySymmetry(factors[i])
+					ret[1]*=factor[1]
+					if(i>0){
+						ret[0]+="x"
+					}
+					ret[0]+=factor[0]
+				}
+				return ret
+			}
+			var links=[]
+			//untwist retropolygons
+			for(var i=0;i<prelinks.length;i++){
+				var link=prelinks[i]
+				if(link[0]<2*link[1]){
+					link=[link[0],link[0]-link[1]]
+				}
+				links.push(link)
+			}
+			if(diagram.nodes.length==1){
+				//A1
+				return ["A1",2]
+			}
+			if(diagram.nodes.length==2){
+				//polygon
+				if(links[0][0]<=6){
+					return [["A2","BC2","H2","G2"][links[0][0]-3],links[0][0]*2]
+				}
+			}
+			if(diagram.nodes.length==3){
+				//H3 and stars
+				var symbols=[[5,3],[3,5],[5,5/2],[5/2,5],[3,5/2],[5/2,3]]
+				for(var i=0;i<symbols.length;i++){
+					var equal=1
+					for(var j=0;j<2;j++){
+						if(symbols[i][j]!=links[j][0]/links[j][1]){
+							equal=0
+							break
+						}
+					}
+					if(equal){
+						return ["H3",120]
+					}
+				}
+			}
+			if(diagram.nodes.length==4){
+				//F4
+				var symbol=[3,4,3]
+				var equal=1
+				for(var i=0;i<3;i++){
+					if(symbol[i]!=links[i][0]/links[i][1]){
+						equal=0
+						break
+					}
+				}
+				if(equal){
+					return ["F4",1152]
+				}
+				//H4 and stars
+				var symbols=[[5,3,3],[3,3,5],[3,5,5/2],[5/2,5,3],[5,5/2,5],[5,3,5/2],[5/2,3,5],[5/2,5,5/2],[5,5/2,3],[3,5/2,5],[3,3,5/2],[5/2,3,3]]
+				for(var i=0;i<symbols.length;i++){
+					var equal=1
+					for(var j=0;j<3;j++){
+						if(symbols[i][j]!=links[j][0]/links[j][1]){
+							equal=0
+							break
+						}
+					}
+					if(equal){
+						return ["H4",14400]
+					}
+				}
+			}
+			for(var i=1;i<diagram.links.length-1;i++){
+				if(diagram.links[i][0]>3){
+					return ["Infinite",Infinity]
+				}
+			}
+			var first=diagram.links[0]
+			var last=diagram.links[diagram.links.length-1]
+			if(first[0]==3&&last[0]==3){
+				return ["A"+diagram.nodes.length,factorial(diagram.nodes.length+1)]
+			}
+			if((first[0]==4&&last[0]==3)||(first[0]==3&&last[0]==4)){
+				return ["BC"+diagram.nodes.length,Math.pow(2,diagram.nodes.length)*factorial(diagram.nodes.length)]
+			}
+			return ["Infinite",Infinity]
+		}
+		//sort by dimension, edge orders, then node activations
+		function orderDiagrams(left,right){
+			if(left.nodes.length<right.nodes.length){
+				return -1
+			}
+			if(right.nodes.length<left.nodes.length){
+				return 1
+			}
+			for(var i=0;i<left.links.length;i++){
+				var leftlink=left.links[i]
+				var rightlink=right.links[i]
+				var leftlinkvalue=leftlink[0]/leftlink[1]
+				var rightlinkvalue=rightlink[0]/rightlink[1]
+				//higher links first
+				if(leftlinkvalue>rightlinkvalue){
+					return -1
+				}
+				if(rightlinkvalue>leftlinkvalue){
+					return 1
+				}
+			}
+			for(var i=0;i<left.nodes.length;i++){
+				var leftnode=left.nodes[i]
+				var rightnode=right.nodes[i]
+				//marked nodes first
+				if(leftnode>rightnode){
+					return -1
+				}
+				if(rightnode>leftnode){
+					return 1
+				}
+			}
+			return 0
+		}
+		function factorizeDiagram(diagram){
+			var factors=[]
+			var currentFactor={nodes:[],links:[]}
+			for(var i=0;i<diagram.nodes.length;i++){
+				currentFactor.nodes.push(diagram.nodes[i])
+				if(i==diagram.links.length||diagram.links[i][0]==2){
+					factors.push(currentFactor)
+					currentFactor={nodes:[],links:[]}
+				}else{
+					currentFactor.links.push(diagram.links[i])
+				}
+			}
+			return factors
+		}
+		function canonizeDiagram(diagram){
+			//break into prism product factors
+			var factors=factorizeDiagram(diagram)
+			//flip factors if more optimal
+			for(var i=0;i<factors.length;i++){
+				var currentFactor=factors[i]
+				var flippedFactor={nodes:[],links:[]}
+				for(var j=currentFactor.nodes.length-1;j>=0;j--){
+					flippedFactor.nodes.push(currentFactor.nodes[j])
+				}
+				for(var j=currentFactor.links.length-1;j>=0;j--){
+					flippedFactor.links.push(currentFactor.links[j])
+				}
+				if(orderDiagrams(flippedFactor,currentFactor)==-1){
+					factors[i]=flippedFactor
+				}
+			}
+			//sort factors
+			for(var i=0;i<factors.length;i++){
+				for(var j=i+1;j<factors.length;j++){
+					if(orderDiagrams(factors[i],factors[j])==1){
+						var temp=factors[i]
+						factors[i]=factors[j]
+						factors[j]=temp
+					}
+				}
+			}
+			//rejoin
+			var canonDiagram={nodes:[],links:[]}
+			for(var i=0;i<factors.length;i++){
+				var factor=factors[i]
+				for(var j=0;j<factor.nodes.length;j++){
+					canonDiagram.nodes.push(factor.nodes[j])
+					if(j<factor.links.length){
+						canonDiagram.links.push(factor.links[j])
+					}else{
+						canonDiagram.links.push([2,1])
+					}
+				}
+			}
+			canonDiagram.links.pop()
+			return canonDiagram
 		}
 		function stringifyDiagram(diagram){
 			var string=""
@@ -108,7 +359,7 @@
 		}
 	</script>
 </head>
-<body onload="document.body.innerHTML=generate()">
+<body onload="document.body.innerHTML=generatePage()">
 
 </body>
 </html>
