@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>General Polytope Project</title>
+	<script type="text/javascript">
+		function generate(){
+			//https://stackoverflow.com/a/979995 more or less
+			var url=new URL(document.URL)
+			var diagramString=url.searchParams.get("p")
+			if(!diagramString){
+				return "You should specify a polytope. Try <a href=\"?p=o3x4o\">the cuboctahedron</a>."
+			}
+			var page=""
+			var diagram=parseDiagram(diagramString)
+			//dimension
+			page+="Dimension: "+diagram.nodes.length+"<br>"
+			//facets
+			page+="Facets:<br>"
+			var facets=[]
+			for(var i=0;i<diagram.nodes.length;i++){
+				//replace a node and its links with a 2 link
+				var facetDiagram={nodes:[],links:[]}
+				for(var j=0;j<diagram.nodes.length;j++){
+					if(j!=i){
+						facetDiagram.nodes.push(diagram.nodes[j])
+						if(j<diagram.links.length){
+							if(j==i-1){
+								facetDiagram.links.push([2,1])
+							}else{
+								facetDiagram.links.push(diagram.links[j])
+							}
+						}
+					}
+				}
+				console.log(facetDiagram)
+				//filter subdimensional facets
+				var lastActiveNode=-1
+				var lastPrismLink=-1
+				var subdimensional=0
+				for(var j=0;j<facetDiagram.nodes.length;j++){
+					if(facetDiagram.nodes[j]){
+						lastActiveNode=j
+					}
+					if(j<facetDiagram.links.length&&facetDiagram.links[j][0]==2){
+						//no active nodes since the last 2->previous component of the CD diagram is a point
+						if(lastActiveNode<lastPrismLink){
+							subdimensional=1
+							break
+						}
+						lastPrismLink=j
+					}
+				}
+				if(subdimensional){
+					continue
+				}
+				page+=linkTo(stringifyDiagram(facetDiagram))+"<br>"
+			}
+			return page
+		}
+		//The format is a linear ASCII CD diagram like x3x4o
+		//Should really find a better way to parse later
+		function parseDiagram(diagram){
+			var nodes=[]
+			var links=[]
+			for(var i=0;i<diagram.length;i++){
+				var char=diagram[i]
+				if(char=="x"||char=="o"){ //node
+					nodes.push({"x":1,"o":0}[char])
+				}else if(char==" "){ //blank
+					links.push([2,1])
+				}else{ //nontrivial line of some sort
+					var link=char
+					for(;!"0123456789/".includes(diagram[i]);i++){
+						link+=diagram[i]
+					}
+					if(link.includes("/")){ //star line
+						var anons=link.split("/")
+						links.push(anons)
+					}else{ //integer line
+						links.push([+link,1])
+					}
+				}
+			}
+			return {nodes:nodes,links:links}
+		}
+		function stringifyDiagram(diagram){
+			var string=""
+			for(var i=0;i<diagram.nodes.length;i++){
+				string+={0:"o",1:"x"}[diagram.nodes[i]]
+				if(i<diagram.links.length){
+					var link=diagram.links[i]
+					if(link[0]==2){
+						string+=" "
+					}else if(link[1]==1){
+						string+=link[0]
+					}else{
+						string+=link[0]+"/"+link[1]
+					}
+				}
+			}
+			return string
+		}
+		function linkTo(page,text){
+			if(!text){
+				text=page
+			}
+			return	"<a href=\"?p="+page+"\">"+text+"</a>"
+		}
+	</script>
+</head>
+<body onload="document.body.innerHTML=generate()">
+
+</body>
+</html>
