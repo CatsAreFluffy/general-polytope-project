@@ -89,27 +89,73 @@
 			//polytopes
 			page+="Polytopes with this symmetry:<br>"
 			//generate all if 6D or less, otherwise generate single-ring forms only
+			var includeAll=0
 			if(diagram.nodes.length<7){
-				for(var i=1;i<Math.pow(2,diagram.nodes.length);i++){
-					var instanceDiagram={nodes:[],links:diagram.links}
+				includeAll=1
+			}
+			var factors=factorizeDiagram(diagram)
+			//if >6 factors, only generate the first form
+			if(factors.length>6){
+				var instanceDiagram={nodes:[],links:symmetry.links}
+				for(var i=0;i<diagram.nodes.length;i++){
+					if(i==0||(i<diagram.links.length&&diagram.links[i][1]==2)){
+						instanceDiagram.nodes.push(1)
+					}else{
+						instanceDiagram.nodes.push(0)
+					}
+				}
+				page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>...<br>"
+			}else{
+				var factorRealizations=[]
+				var indices=[]
+				var limit=1
+				for(var i=0;i<factors.length;i++){
+					factorRealizations.push(symmetryToPolytopes(factors[i],includeAll))
+					indices.push(0)
+					limit*=factorRealizations[factorRealizations.length-1].length
+				}
+				var maxLimit=10000
+				for(var i=0;i<Math.min(limit,maxLimit);i++){
+					var instanceFactors=[]
+					for(var j=0;j<factorRealizations.length;j++){
+						instanceFactors.push(factorRealizations[j][indices[j]])
+					}
+					var instanceDiagram=multiplyDiagrams(instanceFactors)
+					page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>"
+					indices[0]++
+					for(var j=0;j<indices.length-1&&indices[j]>=factorRealizations[j].length;j++){
+						indices[j]=0
+						indices[j+1]++
+					}
+				}
+				if(!includeAll||limit>maxLimit){
+					page+="..."
+				}
+			}
+			return page
+		}
+		function symmetryToPolytopes(symmetry,includeAll){
+			var ret=[]
+			if(includeAll){
+				for(var i=1;i<Math.pow(2,symmetry.nodes.length);i++){
+					var instanceDiagram={nodes:[],links:symmetry.links}
 					var t=i
-					for(var j=0;j<diagram.nodes.length;j++){
+					for(var j=0;j<symmetry.nodes.length;j++){
 						instanceDiagram.nodes.push(t&1)
 						t>>=1
 					}
-					page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>"
+					ret.push(instanceDiagram)
 				}
 			}else{
-				for(var i=0;i<diagram.nodes.length;i++){
-					var instanceDiagram={nodes:[],links:diagram.links}
-					for(var j=0;j<diagram.nodes.length;j++){
+				for(var i=0;i<symmetry.nodes.length;i++){
+					var instanceDiagram={nodes:[],links:symmetry.links}
+					for(var j=0;j<symmetry.nodes.length;j++){
 						instanceDiagram.nodes.push(i==j?1:0)
 					}
-					page+=linkTo(stringifyDiagram(instanceDiagram))+"<br>"
+					ret.push(instanceDiagram)
 				}
-				page+="...<br>"
 			}
-			return page
+			return ret
 		}
 		//The format is a linear ASCII CD diagram like x3x4o
 		//Should really find a better way to parse later
@@ -328,6 +374,22 @@
 			}
 			return factors
 		}
+		function multiplyDiagrams(factors){
+			var diagram={nodes:[],links:[]}
+			for(var i=0;i<factors.length;i++){
+				var factor=factors[i]
+				for(var j=0;j<factor.nodes.length;j++){
+					diagram.nodes.push(factor.nodes[j])
+					if(j<factor.links.length){
+						diagram.links.push(factor.links[j])
+					}else{
+						diagram.links.push([2,1])
+					}
+				}
+			}
+			diagram.links.pop()
+			return diagram
+		}
 		function canonizeDiagram(diagram){
 			//break into prism product factors
 			var factors=factorizeDiagram(diagram)
@@ -356,20 +418,7 @@
 				}
 			}
 			//rejoin
-			var canonDiagram={nodes:[],links:[]}
-			for(var i=0;i<factors.length;i++){
-				var factor=factors[i]
-				for(var j=0;j<factor.nodes.length;j++){
-					canonDiagram.nodes.push(factor.nodes[j])
-					if(j<factor.links.length){
-						canonDiagram.links.push(factor.links[j])
-					}else{
-						canonDiagram.links.push([2,1])
-					}
-				}
-			}
-			canonDiagram.links.pop()
-			return canonDiagram
+			return multiplyDiagrams(factors)
 		}
 		function stringifyDiagram(diagram){
 			var string=""
