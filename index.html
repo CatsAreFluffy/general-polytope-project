@@ -11,17 +11,25 @@
 				return "You should specify a polytope or a symmetry. Try <a href=\"?p=o3x4o\">the cuboctahedron</a> or <a href=\"?p=o3o4o3o\">icoic symmetry</a>."
 			}
 			var diagram;
-			if(names[diagramString]){
+			var canonName=diagramString
+			if(names[diagramString.toLowerCase()]){
 				diagram=shortNameToDiagram(diagramString)
+				canonName=diagramString.toLowerCase()
 			}else{
 				diagram=parseDiagram(diagramString)
+				var canonDiagram=canonizeDiagram(diagram)
+				if(orderDiagrams(diagram,canonDiagram)){
+					canonName=stringifyDiagram(canonDiagram)
+					diagram=canonDiagram
+				}
+				if(diagramToShortName(diagram)){
+					canonName=diagramToShortName(diagram)
+				}
 			}
-			var canonDiagram=canonizeDiagram(diagram)
-			if(orderDiagrams(diagram,canonDiagram)){
-				window.location.replace("?p="+stringifyDiagram(canonDiagram))
-				diagram=canonDiagram
+			if(canonName!=diagramString){
+				window.location.replace(canonName)
 			}
-			if(diagramString.includes("x")){
+			if(nontrivialDimensions(diagram)>0){
 				return generatePolytopePage(diagram)
 			}else{
 				return generateSymmetryPage(diagram)
@@ -152,13 +160,14 @@
 			}
 			return dimensions
 		}
-		var names={"tet":"x3o3o","cube":"x4o3o","oct":"o4o3x","doe":"x5o3o","ike":"o5o3x"}
+		var names={"tet":"x3o3o","cube":"x4o3o","oct":"o4o3x","co":"o4x3o","doe":"x5o3o","ike":"o5o3x","id":"o5x3o","gad":"x5o5/2o","sissid":"o5o5/2x","gike":"x3o5/2o","gissid":"o3o5/2x"}
 		var antinames={}
 		var keys=Object.keys(names)
 		for(var i=0;i<keys.length;i++){
 			antinames[names[keys[i]]]=keys[i]
 		}
 		function shortNameToDiagram(name){
+			name=name.toLowerCase()
 			if(names[name]){
 				return parseDiagram(names[name])
 			}
@@ -201,7 +210,7 @@
 					nodes.push({"x":1,"o":0}[char])
 				}else if(char==" "){ //blank
 					links.push([2,1])
-				}else{ //nontrivial line of some sort
+				}else if("123456789".includes(char)){ //nontrivial line of some sort
 					var link=""
 					for(;"0123456789/".includes(diagram[i]);i++){
 						link+=diagram[i]
@@ -213,6 +222,8 @@
 					}else{ //integer line
 						links.push([+link,1])
 					}
+				}else{
+					return
 				}
 			}
 			return {nodes:nodes,links:links}
