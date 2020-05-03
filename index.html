@@ -11,6 +11,11 @@
 				return "You should specify a polytope or a symmetry. Try <a href=\"?p=o3x4o\">the cuboctahedron</a> or <a href=\"?p=o3o4o3o\">icoic symmetry</a>."
 			}
 			var diagram=parseDiagram(diagramString)
+			var canonDiagram=canonizeDiagram(diagram)
+			if(orderDiagrams(diagram,canonDiagram)){
+				window.location.replace("?p="+stringifyDiagram(canonDiagram))
+				diagram=canonDiagram
+			}
 			if(diagramString.includes("x")){
 				return generatePolytopePage(diagram)
 			}else{
