@@ -10,7 +10,12 @@
 			if(!diagramString){
 				return "You should specify a polytope or a symmetry. Try <a href=\"?p=o3x4o\">the cuboctahedron</a> or <a href=\"?p=o3o4o3o\">icoic symmetry</a>."
 			}
-			var diagram=parseDiagram(diagramString)
+			var diagram;
+			if(names[diagramString]){
+				diagram=shortNameToDiagram(diagramString)
+			}else{
+				diagram=parseDiagram(diagramString)
+			}
 			var canonDiagram=canonizeDiagram(diagram)
 			if(orderDiagrams(diagram,canonDiagram)){
 				window.location.replace("?p="+stringifyDiagram(canonDiagram))
@@ -24,6 +29,11 @@
 		}
 		function generatePolytopePage(diagram){
 			var page=""
+			//name
+			var name=diagramToShortName(diagram)
+			if(name){
+				page+="Name: "+name+"<br>"
+			}
 			//diagram
 			page+="CD diagram: "+stringifyDiagram(diagram)+"<br>"
 			//dimension
@@ -52,27 +62,9 @@
 				}
 				console.log(facetDiagram)
 				facetDiagram=canonizeDiagram(facetDiagram)
+				console.log(nontrivialDimensions(facetDiagram))
 				//filter subdimensional facets
-				var lastActiveNode=-1
-				var lastPrismLink=-1
-				var subdimensional=0
-				for(var j=0;j<facetDiagram.nodes.length;j++){
-					if(facetDiagram.nodes[j]){
-						lastActiveNode=j
-					}
-					if(j<facetDiagram.links.length&&facetDiagram.links[j][0]==2){
-						//no active nodes since the last 2->previous component of the CD diagram is a point
-						if(lastActiveNode<=lastPrismLink){
-							subdimensional=1
-							break
-						}
-						lastPrismLink=j
-					}
-				}
-				if(lastActiveNode<=lastPrismLink){
-					subdimensional=1
-				}
-				if(subdimensional){
+				if(nontrivialDimensions(facetDiagram)<facetDiagram.nodes.length){
 					continue
 				}
 				var facetSymmetry=identifySymmetry(diagramToSymmetry(facetDiagram))
@@ -138,6 +130,42 @@
 				}
 			}
 			return page
+		}
+		function nontrivialDimensions(diagram){
+			var lastActiveNode=-1
+			var lastPrismLink=-1
+			var dimensions=0
+			for(var j=0;j<diagram.nodes.length;j++){
+				if(diagram.nodes[j]){
+					lastActiveNode=j
+				}
+				if(j<diagram.links.length&&diagram.links[j][0]==2){
+					//if the last component was nontrivial, count its dimensions
+					if(lastActiveNode>lastPrismLink){
+						dimensions+=j-lastPrismLink
+					}
+					lastPrismLink=j
+				}
+			}
+			if(lastActiveNode>lastPrismLink){
+				dimensions+=diagram.nodes.length-lastPrismLink-1
+			}
+			return dimensions
+		}
+		var names={"tet":"x3o3o","cube":"x4o3o","oct":"o4o3x","doe":"x5o3o","ike":"o5o3x"}
+		var antinames={}
+		var keys=Object.keys(names)
+		for(var i=0;i<keys.length;i++){
+			antinames[names[keys[i]]]=keys[i]
+		}
+		function shortNameToDiagram(name){
+			if(names[name]){
+				return parseDiagram(names[name])
+			}
+		}
+		function diagramToShortName(diagram){
+			var diagramString=stringifyDiagram(diagram)
+			return antinames[diagramString]
 		}
 		function symmetryToPolytopes(symmetry,includeAll){
 			var ret=[]
